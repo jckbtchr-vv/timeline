@@ -7,8 +7,18 @@ import Link from "next/link";
 
 export default function AdminPage() {
   const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [password, setPassword] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("admin_password") || "";
+    }
+    return "";
+  });
+  const [isAuthorized, setIsAuthorized] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("admin_password");
+    }
+    return false;
+  });
   const [error, setError] = useState("");
 
   // Form fields
@@ -17,14 +27,6 @@ export default function AdminPage() {
   const [consequence, setConsequence] = useState("");
   const [url, setUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    const savedPassword = localStorage.getItem("admin_password");
-    if (savedPassword) {
-      setPassword(savedPassword);
-      setIsAuthorized(true);
-    }
-  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
