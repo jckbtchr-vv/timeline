@@ -1,17 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { TimelineItem } from "@/components/TimelineItem";
 import { Search, ArrowUpDown, Clock } from "lucide-react";
 
-interface Entry {
-  id: string;
-  date: string;
-  title: string;
-  consequence: string;
-  url: string | null;
-  createdAt: string;
-}
+import { fetchTimelineEntries, type Entry } from "@/lib/timeline-data";
 
 export default function TimelinePage() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -20,18 +13,26 @@ export default function TimelinePage() {
   const [isOldestFirst, setIsOldestFirst] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/entries")
-      .then((res) => res.json())
-      .then((data) => {
-        setEntries(data);
-        setIsLoading(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadEntries = useCallback(() => {
+    return fetchTimelineEntries()
+      .then(setEntries)
+      .catch((error: unknown) => {
+        setLoadError(error instanceof Error ? error.message : "The timeline could not be loaded.");
       })
-      .catch((err) => {
-        console.error("Failed to fetch entries", err);
-        setIsLoading(false);
-      });
+      .finally(() => setIsLoading(false));
   }, []);
+
+  const retry = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    void loadEntries();
+  };
+
+  useEffect(() => {
+    void loadEntries();
+  }, [loadEntries]);
 
   const years = useMemo(() => {
     const yearsSet = new Set(entries.map((e) => e.date.split("-")[0]));
@@ -121,6 +122,17 @@ export default function TimelinePage() {
         <div className="py-20 text-center font-mono text-white/20 animate-pulse uppercase tracking-widest">
           Initializing stream...
         </div>
+      ) : loadError ? (
+        <div role="alert" className="py-20 flex flex-col items-center gap-4 text-center font-mono uppercase tracking-widest">
+          <h2 className="text-sm text-white/70">Timeline unavailable</h2>
+          <p className="text-xs text-white/40">{loadError}</p>
+          <button
+            onClick={retry}
+            className="border border-white/20 px-4 py-3 text-sm hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
+            Retry
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col">
           {filteredEntries.length > 0 ? (
@@ -138,7 +150,7 @@ export default function TimelinePage() {
       <footer className="mt-20 pt-8 border-t border-white/10 flex flex-col gap-2 items-center text-center">
         <div className="flex items-center gap-2 text-white/30 font-mono text-[10px] uppercase tracking-[0.2em]">
           <Clock size={10} />
-          Last Updated: {lastUpdated || "Never"}
+          Last Updated: {lastUpdated || (loadError ? "Unavailable" : "Never")}
         </div>
         <div className="text-white/10 font-mono text-[10px] uppercase tracking-[0.1em]">
           Append-only architecture. No edits. No deletes.
